@@ -82,8 +82,10 @@ export default function SessionScreen({
   }
 
   const sendAudio = async (blob, role) => {
+    const actualSrc = role === 'me' ? sourceLang : targetLang
+    const actualTgt = role === 'me' ? targetLang : sourceLang
     try {
-      const result = await transcribeAndTranslate(blob, sourceLang, targetLang, role, sessionId)
+      const result = await transcribeAndTranslate(blob, actualSrc, actualTgt, role, sessionId)
       setMessages((prev) => [...prev, {
         id: result.id || Date.now().toString(),
         speakerRole: result.speakerRole,
