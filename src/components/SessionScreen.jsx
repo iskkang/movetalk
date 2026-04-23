@@ -68,7 +68,7 @@ export default function SessionScreen({
         // Silently ignore poll errors — Toast already shown for recording errors
       }
     }
-    const interval = setInterval(poll, 2000)
+    const interval = setInterval(poll, 3000)
     return () => {
       cancelled = true
       clearInterval(interval)

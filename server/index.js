@@ -18,6 +18,9 @@ const { createSession, addMessage, getAllSessions, getSession, endSession, delet
 const app = express()
 const PORT = process.env.PORT || 3001
 
+// Trust Vercel/reverse-proxy so req.ip reflects the real client IP
+app.set('trust proxy', 1)
+
 // CORS
 app.use(cors({
   origin: ['http://localhost:5173', process.env.FRONTEND_URL].filter(Boolean),
@@ -25,16 +28,16 @@ app.use(cors({
 
 app.use(express.json())
 
-// In-memory rate limiter: 30 req/min per IP
+// In-memory rate limiter: 200 req/min per real client IP
 const ipRequests = {}
 app.use((req, res, next) => {
-  const ip = req.ip
+  const ip = req.ip || req.socket.remoteAddress
   const now = Date.now()
   if (!ipRequests[ip] || now > ipRequests[ip].resetAt) {
     ipRequests[ip] = { count: 1, resetAt: now + 60_000 }
   } else {
     ipRequests[ip].count++
-    if (ipRequests[ip].count > 30) {
+    if (ipRequests[ip].count > 200) {
       return res.status(429).json({ error: '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.' })
     }
   }
