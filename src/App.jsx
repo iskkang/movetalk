@@ -3,6 +3,7 @@ import StartScreen from './components/StartScreen'
 import SessionScreen from './components/SessionScreen'
 import HistoryScreen from './components/HistoryScreen'
 import HistoryDetailScreen from './components/HistoryDetailScreen'
+import ViewerScreen from './components/ViewerScreen'
 
 export const LANGUAGES = [
   { code: 'ko', label: '한국어' },
@@ -13,6 +14,12 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('start')
   const [sessionInfo, setSessionInfo] = useState(null)
   const [selectedSessionId, setSelectedSessionId] = useState(null)
+
+  // Viewer mode: other party opens a shared link
+  const viewSessionId = new URLSearchParams(window.location.search).get('view')
+  if (viewSessionId) {
+    return <ViewerScreen sessionId={viewSessionId} />
+  }
 
   const goSession = (info) => {
     setSessionInfo(info)
