@@ -17,7 +17,7 @@ export default function StartScreen({ onStart, onHistory }) {
 
   const handleStart = async () => {
     if (!contactName.trim()) {
-      showToast('상대방 이름을 입력해주세요.')
+      showToast('상대방 이름을 입력해주세요. / Введите имя собеседника.')
       return
     }
     setLoading(true)
@@ -60,28 +60,28 @@ export default function StartScreen({ onStart, onHistory }) {
       <Toast {...toast} onHide={hideToast} />
       <div style={cardStyle}>
         <div style={titleStyle}>🎙️ Live Subtitle Interpreter</div>
-        <label style={labelStyle}>상대방 이름 *</label>
-        <input style={inputStyle} placeholder="상대방 이름" value={contactName} onChange={(e) => setContactName(e.target.value)} />
-        <label style={labelStyle}>회사명 (선택)</label>
-        <input style={inputStyle} placeholder="회사명 (선택)" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+        <label style={labelStyle}>상대방 이름 * / Имя собеседника *</label>
+        <input style={inputStyle} placeholder="이름 / Имя" value={contactName} onChange={(e) => setContactName(e.target.value)} />
+        <label style={labelStyle}>회사명 / Компания (선택)</label>
+        <input style={inputStyle} placeholder="회사명 / Компания" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
         <div style={langRowStyle}>
           <div>
-            <label style={labelStyle}>내 언어</label>
+            <label style={labelStyle}>내 언어 / Мой язык</label>
             <select style={selectStyle} value={sourceLang} onChange={(e) => setSourceLang(e.target.value)}>
               {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
           </div>
           <div>
-            <label style={labelStyle}>상대방 언어</label>
+            <label style={labelStyle}>상대방 언어 / Язык собеседника</label>
             <select style={selectStyle} value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>
               {LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.label}</option>)}
             </select>
           </div>
         </div>
         <button style={startBtnStyle} onClick={handleStart} disabled={loading}>
-          {loading ? '시작 중...' : 'Start Session'}
+          {loading ? '시작 중...' : 'Start Session / Начать сеанс'}
         </button>
-        <button style={historyBtnStyle} onClick={onHistory}>대화 기록</button>
+        <button style={historyBtnStyle} onClick={onHistory}>대화 기록 / История</button>
       </div>
     </div>
   )
