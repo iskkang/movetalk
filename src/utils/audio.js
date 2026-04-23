@@ -1,9 +1,16 @@
 let mediaRecorder = null
 let chunks = []
 let startTime = null
+let sharedStream = null
+
+async function getStream() {
+  if (sharedStream && sharedStream.active) return sharedStream
+  sharedStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  return sharedStream
+}
 
 export async function startRecording() {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+  const stream = await getStream()
   chunks = []
   startTime = Date.now()
   mediaRecorder = new MediaRecorder(stream)
@@ -21,13 +28,22 @@ export function stopRecording() {
     }
     mediaRecorder.onstop = () => {
       const blob = new Blob(chunks, { type: 'audio/webm' })
-      mediaRecorder.stream.getTracks().forEach((t) => t.stop())
       mediaRecorder = null
       chunks = []
       resolve(blob)
     }
     mediaRecorder.stop()
+    // Keep sharedStream alive — don't stop tracks here
   })
+}
+
+export function releaseStream() {
+  if (sharedStream) {
+    sharedStream.getTracks().forEach((t) => t.stop())
+    sharedStream = null
+  }
+  mediaRecorder = null
+  chunks = []
 }
 
 export function getRecordingDuration() {

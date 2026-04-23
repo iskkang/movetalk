@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import SubtitleCard from './SubtitleCard'
 import Toast from './Toast'
 import { getSessionDetail, transcribeAndTranslate } from '../utils/api'
-import { startRecording, stopRecording, getRecordingDuration } from '../utils/audio'
+import { startRecording, stopRecording, getRecordingDuration, releaseStream } from '../utils/audio'
 
 const SPEAK_LABEL = { ko: '말하기', ru: 'Говорить', en: 'Speak' }
 const STOP_LABEL = { ko: '누르면 종료', ru: 'нажать для остановки', en: 'tap to stop' }
@@ -42,6 +42,7 @@ export default function ViewerScreen({ sessionId }) {
     return () => {
       cancelled = true
       clearInterval(interval)
+      releaseStream()
     }
   }, [sessionId])
 

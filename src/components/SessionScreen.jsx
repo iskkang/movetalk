@@ -2,8 +2,8 @@ import { useState, useRef, useEffect } from 'react'
 import SubtitleCard from './SubtitleCard'
 import Toast from './Toast'
 import Modal from './Modal'
-import { startRecording, stopRecording, getRecordingDuration } from '../utils/audio'
-import { transcribeAndTranslate, endSession } from '../utils/api'
+import { startRecording, stopRecording, getRecordingDuration, releaseStream } from '../utils/audio'
+import { transcribeAndTranslate, endSession, getSessionDetail } from '../utils/api'
 
 export default function SessionScreen({
   contactName, companyName, sourceLang, targetLang, sessionId, sessionTitle,
@@ -36,6 +36,44 @@ export default function SessionScreen({
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [messages])
+
+  // Poll server every 2s to pick up messages from the remote party
+  useEffect(() => {
+    let cancelled = false
+    async function poll() {
+      try {
+        const data = await getSessionDetail(sessionId)
+        if (cancelled) return
+        setMessages((prev) => {
+          const prevById = new Map(prev.map((m) => [m.id, m]))
+          const serverMsgs = (data.messages || []).map((m) => {
+            if (prevById.has(m.id)) return prevById.get(m.id)
+            return {
+              id: m.id,
+              speakerRole: m.speaker_role,
+              originalText: m.original_text,
+              translatedText: m.translated_text,
+              timestamp: m.timestamp
+                ? new Date(m.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+                : '',
+            }
+          })
+          if (
+            serverMsgs.length === prev.length &&
+            serverMsgs.every((m, i) => m.id === prev[i]?.id)
+          ) return prev
+          return serverMsgs
+        })
+      } catch {
+        // Silently ignore poll errors — Toast already shown for recording errors
+      }
+    }
+    const interval = setInterval(poll, 2000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [sessionId])
 
   const handleToggleRecording = async () => {
     if (sessionEnded || isProcessing) return
@@ -103,6 +141,7 @@ export default function SessionScreen({
       try { await stopRecording() } catch {}
       setIsRecording(false)
     }
+    releaseStream()
     try { await endSession(sessionId) } catch {}
     setSessionEnded(true)
     setShowModal(true)
