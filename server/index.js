@@ -11,7 +11,9 @@ require('dotenv').config()
 const express = require('express')
 const cors = require('cors')
 const multer = require('multer')
-const { createSession, getAllSessions, getSession, endSession } = require('./sessionStore')
+const OpenAI = require('openai')
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+const { createSession, addMessage, getAllSessions, getSession, endSession } = require('./sessionStore')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -100,14 +102,68 @@ app.post('/api/sessions/:sessionId/end', async (req, res) => {
   }
 })
 
-// Placeholder — implemented in Step 4
 app.post('/api/transcribe-and-translate', (req, res, next) => {
-  upload.single('audio')(req, res, (err) => {
+  upload.single('audio')(req, res, async (err) => {
     if (err?.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({ error: '파일이 너무 큽니다. 10MB 이하만 허용됩니다.' })
     }
     if (err) return next(err)
-    res.status(501).json({ error: 'Step 4에서 구현됩니다.' })
+
+    const { sourceLang, targetLang, speakerRole, sessionId } = req.body
+
+    if (!req.file) {
+      return res.status(400).json({ error: '오디오 파일이 없습니다.' })
+    }
+
+    try {
+      const langNames = { ko: '한국어', ru: '러시아어', en: '영어' }
+
+      // Whisper STT
+      const { toFile } = require('openai')
+      const audioFile = await toFile(req.file.buffer, 'audio.webm', { type: req.file.mimetype })
+      const transcription = await openai.audio.transcriptions.create({
+        file: audioFile,
+        model: 'whisper-1',
+        language: sourceLang,
+      })
+      const originalText = transcription.text?.trim()
+
+      if (!originalText) {
+        return res.status(422).json({ error: '음성을 인식하지 못했습니다. 다시 시도해주세요.' })
+      }
+
+      // GPT-4o translation
+      const srcName = langNames[sourceLang] || sourceLang
+      const tgtName = langNames[targetLang] || targetLang
+      const chat = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a professional business interpreter specializing in logistics and international trade. Translate the following text from ${srcName} to ${tgtName}. Return only the translated text with no explanations or notes.`,
+          },
+          { role: 'user', content: originalText },
+        ],
+        temperature: 0.3,
+      })
+      const translatedText = chat.choices[0].message.content?.trim()
+
+      // Save to Supabase
+      const msg = await addMessage(sessionId, { speakerRole, originalText, translatedText })
+
+      res.json({
+        id: msg.id,
+        originalText,
+        translatedText,
+        speakerRole,
+        sourceLang,
+        targetLang,
+        timestamp: msg.timestamp,
+      })
+    } catch (err) {
+      console.error('transcribe-and-translate error:', err)
+      res.status(500).json({ error: '처리 중 오류가 발생했습니다. 다시 시도해주세요.' })
+    }
   })
 })
 
