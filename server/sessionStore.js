@@ -129,4 +129,19 @@ async function endSession(sessionId) {
   return { ...data, totalMessages: sess.total_messages }
 }
 
-module.exports = { createSession, addMessage, getSession, getAllSessions, endSession }
+async function deleteSession(sessionId) {
+  // Delete messages first (FK constraint)
+  const { error: msgError } = await supabase
+    .from('messages')
+    .delete()
+    .eq('session_id', sessionId)
+  if (msgError) throw msgError
+
+  const { error } = await supabase
+    .from('sessions')
+    .delete()
+    .eq('id', sessionId)
+  if (error) throw error
+}
+
+module.exports = { createSession, addMessage, getSession, getAllSessions, endSession, deleteSession }

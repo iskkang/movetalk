@@ -13,7 +13,7 @@ const cors = require('cors')
 const multer = require('multer')
 const OpenAI = require('openai')
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-const { createSession, addMessage, getAllSessions, getSession, endSession } = require('./sessionStore')
+const { createSession, addMessage, getAllSessions, getSession, endSession, deleteSession } = require('./sessionStore')
 
 const app = express()
 const PORT = process.env.PORT || 3001
@@ -99,6 +99,16 @@ app.post('/api/sessions/:sessionId/end', async (req, res) => {
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: '세션을 종료할 수 없습니다.' })
+  }
+})
+
+app.delete('/api/sessions/:sessionId', async (req, res) => {
+  try {
+    await deleteSession(req.params.sessionId)
+    res.json({ ok: true })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: '세션을 삭제할 수 없습니다.' })
   }
 })
 

@@ -52,3 +52,9 @@ export async function endSession(sessionId) {
   if (!res.ok) throw new Error('세션 종료에 실패했습니다.')
   return res.json()
 }
+
+export async function deleteSession(sessionId) {
+  const res = await fetch(`${BASE_URL}/api/sessions/${sessionId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error('삭제에 실패했습니다.')
+  return res.json()
+}

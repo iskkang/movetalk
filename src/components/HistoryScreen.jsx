@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { getSessions } from '../utils/api'
+import { getSessions, deleteSession } from '../utils/api'
 
 export default function HistoryScreen({ onBack, onSelectSession }) {
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => {
     getSessions()
@@ -12,6 +13,20 @@ export default function HistoryScreen({ onBack, onSelectSession }) {
       .catch(() => setError('기록을 불러오지 못했습니다.'))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleDelete = async (e, sessionId) => {
+    e.stopPropagation()
+    if (!window.confirm('이 대화 기록을 삭제하시겠습니까?')) return
+    setDeletingId(sessionId)
+    try {
+      await deleteSession(sessionId)
+      setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+    } catch {
+      alert('삭제에 실패했습니다. 다시 시도해주세요.')
+    } finally {
+      setDeletingId(null)
+    }
+  }
 
   const screenStyle = {
     minHeight: '100vh',
@@ -88,8 +103,26 @@ export default function HistoryScreen({ onBack, onSelectSession }) {
         )}
         {sessions.map((s) => (
           <div key={s.id} style={cardStyle} onClick={() => onSelectSession(s.id)}>
-            <div style={{ fontSize: '17px', fontWeight: '700', color: '#111827', marginBottom: '2px' }}>
-              {s.contact_name}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ fontSize: '17px', fontWeight: '700', color: '#111827', marginBottom: '2px' }}>
+                {s.contact_name}
+              </div>
+              <button
+                onClick={(e) => handleDelete(e, s.id)}
+                disabled={deletingId === s.id}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9ca3af',
+                  fontSize: '18px',
+                  cursor: deletingId === s.id ? 'not-allowed' : 'pointer',
+                  padding: '0 4px',
+                  lineHeight: 1,
+                  flexShrink: 0,
+                }}
+              >
+                {deletingId === s.id ? '⏳' : '🗑️'}
+              </button>
             </div>
             {s.company_name && (
               <div style={{ fontSize: '13px', color: '#9ca3af', marginBottom: '4px' }}>{s.company_name}</div>
