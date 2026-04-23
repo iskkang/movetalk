@@ -165,6 +165,10 @@ export default function SessionScreen({
     }
   }
 
+  const handleShareKakao = () => {
+    window.location.href = `kakaotalk://msg/send?text=${encodeURIComponent(shareMessage)}`
+  }
+
   const handleShareWhatsApp = () => {
     window.open(`https://wa.me/?text=${encodeURIComponent(shareMessage)}`, '_blank')
   }
@@ -264,12 +268,12 @@ export default function SessionScreen({
     flexWrap: 'wrap',
   }
 
-  const shareBtn = (bg) => ({
+  const shareBtn = (bg, color = '#fff') => ({
     flex: 1,
     minWidth: '52px',
     padding: '8px 4px',
     backgroundColor: bg,
-    color: '#fff',
+    color,
     border: 'none',
     borderRadius: '7px',
     fontSize: '12px',
@@ -380,6 +384,7 @@ export default function SessionScreen({
 
         {showInvitePanel && (
           <div style={sharePanelStyle}>
+            <button style={shareBtn('#FEE500', '#000000')} onClick={handleShareKakao}>카카오톡</button>
             <button style={shareBtn('#25D366')} onClick={handleShareWhatsApp}>WhatsApp</button>
             <button style={shareBtn('#0088cc')} onClick={handleShareTelegram}>Telegram</button>
             <button style={shareBtn('#4b5563')} onClick={handleShareSMS}>SMS</button>
