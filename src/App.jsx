@@ -1,3 +1,65 @@
+import { useState } from 'react'
+import StartScreen from './components/StartScreen'
+import SessionScreen from './components/SessionScreen'
+import HistoryScreen from './components/HistoryScreen'
+import HistoryDetailScreen from './components/HistoryDetailScreen'
+
+export const LANGUAGES = [
+  { code: 'ko', label: '한국어' },
+  { code: 'ru', label: 'Russian' },
+]
+
 export default function App() {
-  return <div>Loading...</div>
+  const [currentScreen, setCurrentScreen] = useState('start')
+  const [sessionInfo, setSessionInfo] = useState(null)
+  const [selectedSessionId, setSelectedSessionId] = useState(null)
+
+  const goSession = (info) => {
+    setSessionInfo(info)
+    setCurrentScreen('session')
+  }
+
+  const goHistory = () => setCurrentScreen('history')
+
+  const goHistoryDetail = (sessionId) => {
+    setSelectedSessionId(sessionId)
+    setCurrentScreen('historyDetail')
+  }
+
+  const goStart = () => setCurrentScreen('start')
+
+  if (currentScreen === 'session' && sessionInfo) {
+    return (
+      <SessionScreen
+        {...sessionInfo}
+        onEnd={goStart}
+        onViewHistory={goHistory}
+      />
+    )
+  }
+
+  if (currentScreen === 'history') {
+    return (
+      <HistoryScreen
+        onBack={goStart}
+        onSelectSession={goHistoryDetail}
+      />
+    )
+  }
+
+  if (currentScreen === 'historyDetail' && selectedSessionId) {
+    return (
+      <HistoryDetailScreen
+        sessionId={selectedSessionId}
+        onBack={goHistory}
+      />
+    )
+  }
+
+  return (
+    <StartScreen
+      onStart={goSession}
+      onHistory={goHistory}
+    />
+  )
 }
