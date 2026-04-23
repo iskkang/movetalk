@@ -14,11 +14,14 @@ export default function SessionScreen({
   const [showModal, setShowModal] = useState(false)
   const [toast, setToast] = useState({ visible: false, message: '', type: 'error' })
   const [isRecording, setIsRecording] = useState(false)
-  const [recordingRole, setRecordingRole] = useState(null)
   const [isProcessing, setIsProcessing] = useState(false)
   const [lastBlob, setLastBlob] = useState(null)
-  const [lastRole, setLastRole] = useState(null)
   const [showRetry, setShowRetry] = useState(false)
+
+  const SPEAK_LABEL = { ko: '말하기', ru: 'Говорить', en: 'Speak' }
+  const STOP_LABEL = { ko: '누르면 종료', ru: 'нажать для остановки', en: 'tap to stop' }
+  const speakLabel = SPEAK_LABEL[sourceLang] || '말하기'
+  const stopLabel = STOP_LABEL[sourceLang] || '누르면 종료'
   const [linkCopied, setLinkCopied] = useState(false)
   const scrollRef = useRef(null)
 
@@ -34,29 +37,24 @@ export default function SessionScreen({
     }
   }, [messages])
 
-  const handleToggleRecording = async (role) => {
+  const handleToggleRecording = async () => {
     if (sessionEnded || isProcessing) return
 
-    // If recording with the same role, stop
-    if (isRecording && recordingRole === role) {
+    if (isRecording) {
       const duration = getRecordingDuration()
       if (duration < 500) {
         try { await stopRecording() } catch {}
         setIsRecording(false)
-        setRecordingRole(null)
         showToast('너무 짧습니다. 다시 눌러 말해주세요. / Слишком коротко.')
         return
       }
       setIsRecording(false)
-      setRecordingRole(null)
       setIsProcessing(true)
       setShowRetry(false)
-
       try {
         const blob = await stopRecording()
         setLastBlob(blob)
-        setLastRole(role)
-        await sendAudio(blob, role)
+        await sendAudio(blob)
       } catch {
         showToast('녹음 중 오류가 발생했습니다.')
         setIsProcessing(false)
@@ -64,28 +62,17 @@ export default function SessionScreen({
       return
     }
 
-    // If recording with different role, stop that first
-    if (isRecording) {
-      try { await stopRecording() } catch {}
-      setIsRecording(false)
-      setRecordingRole(null)
-    }
-
-    // Start recording
     try {
       await startRecording()
       setIsRecording(true)
-      setRecordingRole(role)
     } catch {
       showToast('마이크 접근이 거부되었습니다. / Микрофон недоступен.')
     }
   }
 
-  const sendAudio = async (blob, role) => {
-    const actualSrc = role === 'me' ? sourceLang : targetLang
-    const actualTgt = role === 'me' ? targetLang : sourceLang
+  const sendAudio = async (blob) => {
     try {
-      const result = await transcribeAndTranslate(blob, actualSrc, actualTgt, role, sessionId)
+      const result = await transcribeAndTranslate(blob, sourceLang, targetLang, 'me', sessionId)
       setMessages((prev) => [...prev, {
         id: result.id || Date.now().toString(),
         speakerRole: result.speakerRole,
@@ -105,10 +92,10 @@ export default function SessionScreen({
   }
 
   const handleRetry = async () => {
-    if (!lastBlob || !lastRole) return
+    if (!lastBlob) return
     setIsProcessing(true)
     setShowRetry(false)
-    await sendAudio(lastBlob, lastRole)
+    await sendAudio(lastBlob)
   }
 
   const handleEndSession = async () => {
@@ -236,29 +223,20 @@ export default function SessionScreen({
     borderTop: '1px solid #e5e7eb',
   }
 
-  const btnRowStyle = {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '10px',
+  const speakBtnStyle = {
+    width: '100%',
+    padding: '20px 8px',
     marginBottom: showRetry ? '8px' : 0,
-  }
-
-  const getBtnStyle = (role, color) => ({
-    padding: '18px 8px',
-    backgroundColor: isProcessing
-      ? '#e5e7eb'
-      : isRecording && recordingRole === role
-      ? '#dc2626'
-      : color,
+    backgroundColor: isProcessing ? '#e5e7eb' : isRecording ? '#dc2626' : '#1d4ed8',
     color: isProcessing ? '#9ca3af' : '#ffffff',
-    border: isRecording && recordingRole === role ? '3px solid #fca5a5' : '3px solid transparent',
+    border: isRecording ? '3px solid #fca5a5' : '3px solid transparent',
     borderRadius: '12px',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: '700',
     cursor: sessionEnded || isProcessing ? 'not-allowed' : 'pointer',
     opacity: sessionEnded ? 0.5 : 1,
     transition: 'background-color 0.2s, border-color 0.2s',
-  })
+  }
 
   const retryBtnStyle = {
     width: '100%',
@@ -345,22 +323,13 @@ export default function SessionScreen({
         {isProcessing && (
           <div style={processingStyle}>⏳ 처리 중... / Обработка...</div>
         )}
-        <div style={btnRowStyle}>
-          <button
-            style={getBtnStyle('me', '#1d4ed8')}
-            onClick={() => handleToggleRecording('me')}
-            disabled={sessionEnded || isProcessing}
-          >
-            {isRecording && recordingRole === 'me' ? '🔴 나 말하기\n누르면 종료' : '🎙️ 나 말하기'}
-          </button>
-          <button
-            style={getBtnStyle('other', '#ea580c')}
-            onClick={() => handleToggleRecording('other')}
-            disabled={sessionEnded || isProcessing}
-          >
-            {isRecording && recordingRole === 'other' ? '🔴 상대방\n누르면 종료' : '🎙️ 상대방'}
-          </button>
-        </div>
+        <button
+          style={speakBtnStyle}
+          onClick={handleToggleRecording}
+          disabled={sessionEnded || isProcessing}
+        >
+          {isRecording ? `🔴 ${speakLabel} — ${stopLabel}` : `🎙️ ${speakLabel}`}
+        </button>
         {showRetry && (
           <button style={retryBtnStyle} onClick={handleRetry}>
             ⚠️ 실패 — 재시도 / Повторить

@@ -1,13 +1,26 @@
 import { useState, useEffect, useRef } from 'react'
 import SubtitleCard from './SubtitleCard'
-import { getSessionDetail } from '../utils/api'
+import Toast from './Toast'
+import { getSessionDetail, transcribeAndTranslate } from '../utils/api'
+import { startRecording, stopRecording, getRecordingDuration } from '../utils/audio'
+
+const SPEAK_LABEL = { ko: '말하기', ru: 'Говорить', en: 'Speak' }
+const STOP_LABEL = { ko: '누르면 종료', ru: 'нажать для остановки', en: 'tap to stop' }
 
 export default function ViewerScreen({ sessionId }) {
   const [session, setSession] = useState(null)
   const [messages, setMessages] = useState([])
   const [error, setError] = useState(null)
   const [lastCount, setLastCount] = useState(0)
+  const [isRecording, setIsRecording] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [showRetry, setShowRetry] = useState(false)
+  const [lastBlob, setLastBlob] = useState(null)
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'error' })
   const scrollRef = useRef(null)
+
+  const showToast = (message, type = 'error') => setToast({ visible: true, message, type })
+  const hideToast = () => setToast((t) => ({ ...t, visible: false }))
 
   useEffect(() => {
     let cancelled = false
@@ -40,6 +53,83 @@ export default function ViewerScreen({ sessionId }) {
       }
     }
   }, [messages])
+
+  const viewerLang = session?.target_lang
+  const hostLang = session?.source_lang
+  const speakLabel = SPEAK_LABEL[viewerLang] || 'Говорить'
+  const stopLabel = STOP_LABEL[viewerLang] || 'нажать для остановки'
+
+  const handleToggleRecording = async () => {
+    if (!session || isProcessing) return
+
+    if (isRecording) {
+      const duration = getRecordingDuration()
+      if (duration < 500) {
+        try { await stopRecording() } catch {}
+        setIsRecording(false)
+        showToast('Слишком коротко. / 너무 짧습니다.')
+        return
+      }
+      setIsRecording(false)
+      setIsProcessing(true)
+      setShowRetry(false)
+      try {
+        const blob = await stopRecording()
+        setLastBlob(blob)
+        const result = await transcribeAndTranslate(blob, viewerLang, hostLang, 'other', sessionId)
+        setMessages((prev) => {
+          const exists = prev.find((m) => m.id === result.id)
+          if (exists) return prev
+          return [...prev, {
+            id: result.id || Date.now().toString(),
+            speaker_role: result.speakerRole,
+            original_text: result.originalText,
+            translated_text: result.translatedText,
+            timestamp: result.timestamp,
+          }]
+        })
+        setShowRetry(false)
+      } catch (err) {
+        showToast(err.message || 'Ошибка. / 오류가 발생했습니다.')
+        setShowRetry(true)
+      } finally {
+        setIsProcessing(false)
+      }
+      return
+    }
+
+    try {
+      await startRecording()
+      setIsRecording(true)
+    } catch {
+      showToast('Микрофон недоступен. / 마이크 접근이 거부되었습니다.')
+    }
+  }
+
+  const handleRetry = async () => {
+    if (!lastBlob || !session) return
+    setIsProcessing(true)
+    setShowRetry(false)
+    try {
+      const result = await transcribeAndTranslate(lastBlob, viewerLang, hostLang, 'other', sessionId)
+      setMessages((prev) => {
+        const exists = prev.find((m) => m.id === result.id)
+        if (exists) return prev
+        return [...prev, {
+          id: result.id || Date.now().toString(),
+          speaker_role: result.speakerRole,
+          original_text: result.originalText,
+          translated_text: result.translatedText,
+          timestamp: result.timestamp,
+        }]
+      })
+    } catch (err) {
+      showToast(err.message || 'Ошибка. / 오류가 발생했습니다.')
+      setShowRetry(true)
+    } finally {
+      setIsProcessing(false)
+    }
+  }
 
   const formatTime = (iso) => {
     if (!iso) return ''
@@ -118,13 +208,43 @@ export default function ViewerScreen({ sessionId }) {
     zIndex: 999,
   }
 
-  const footerStyle = {
-    padding: '10px 16px',
+  const bottomStyle = {
+    padding: '12px 16px',
     backgroundColor: '#ffffff',
     borderTop: '1px solid #e5e7eb',
+  }
+
+  const speakBtnStyle = {
+    width: '100%',
+    padding: '20px 8px',
+    marginBottom: showRetry ? '8px' : 0,
+    backgroundColor: isProcessing ? '#e5e7eb' : isRecording ? '#dc2626' : '#ea580c',
+    color: isProcessing ? '#9ca3af' : '#ffffff',
+    border: isRecording ? '3px solid #fca5a5' : '3px solid transparent',
+    borderRadius: '12px',
+    fontSize: '16px',
+    fontWeight: '700',
+    cursor: isProcessing ? 'not-allowed' : 'pointer',
+    transition: 'background-color 0.2s, border-color 0.2s',
+  }
+
+  const retryBtnStyle = {
+    width: '100%',
+    padding: '10px',
+    backgroundColor: '#fef3c7',
+    color: '#92400e',
+    border: '1px solid #fde68a',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+  }
+
+  const processingStyle = {
     textAlign: 'center',
-    fontSize: '12px',
-    color: '#9ca3af',
+    fontSize: '13px',
+    color: '#6b7280',
+    padding: '6px 0 2px',
   }
 
   if (!session && !error) {
@@ -139,6 +259,7 @@ export default function ViewerScreen({ sessionId }) {
 
   return (
     <div style={containerStyle}>
+      <Toast {...toast} onHide={hideToast} />
       {error && <div style={errorStyle}>{error}</div>}
 
       <div style={headerStyle}>
@@ -172,8 +293,22 @@ export default function ViewerScreen({ sessionId }) {
         )}
       </div>
 
-      <div style={footerStyle}>
-        실시간 자막 보기 · Просмотр субтитров в реальном времени
+      <div style={bottomStyle}>
+        {isProcessing && (
+          <div style={processingStyle}>⏳ Обработка... / 처리 중...</div>
+        )}
+        <button
+          style={speakBtnStyle}
+          onClick={handleToggleRecording}
+          disabled={isProcessing || !session}
+        >
+          {isRecording ? `🔴 ${speakLabel} — ${stopLabel}` : `🎙️ ${speakLabel}`}
+        </button>
+        {showRetry && (
+          <button style={retryBtnStyle} onClick={handleRetry}>
+            ⚠️ Повторить / 재시도
+          </button>
+        )}
       </div>
     </div>
   )
