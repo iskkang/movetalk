@@ -1,9 +1,17 @@
+import { useState, useEffect } from 'react'
 import SubtitleCard from './SubtitleCard'
+import { getSessionDetail } from '../utils/api'
 
 export default function HistoryDetailScreen({ sessionId, onBack }) {
-  // In Phase 2 (Step 7) this will fetch from API; placeholder for now
-  const session = null
-  const loading = false
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    getSessionDetail(sessionId)
+      .then(setSession)
+      .catch(() => setSession(null))
+      .finally(() => setLoading(false))
+  }, [sessionId])
 
   const screenStyle = {
     minHeight: '100vh',

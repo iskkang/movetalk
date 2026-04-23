@@ -1,7 +1,17 @@
+import { useState, useEffect } from 'react'
+import { getSessions } from '../utils/api'
+
 export default function HistoryScreen({ onBack, onSelectSession }) {
-  // In Phase 2 (Step 7) this will fetch from API; placeholder for now
-  const sessions = []
-  const loading = false
+  const [sessions, setSessions] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    getSessions()
+      .then(setSessions)
+      .catch(() => setError('기록을 불러오지 못했습니다.'))
+      .finally(() => setLoading(false))
+  }, [])
 
   const screenStyle = {
     minHeight: '100vh',
@@ -72,7 +82,8 @@ export default function HistoryScreen({ onBack, onSelectSession }) {
 
       <div style={listStyle}>
         {loading && <div style={emptyStyle}>불러오는 중...</div>}
-        {!loading && sessions.length === 0 && (
+        {!loading && error && <div style={{ ...emptyStyle, color: '#dc2626' }}>{error}</div>}
+        {!loading && !error && sessions.length === 0 && (
           <div style={emptyStyle}>저장된 대화 기록이 없습니다.</div>
         )}
         {sessions.map((s) => (
