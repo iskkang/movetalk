@@ -22,14 +22,22 @@ export default function SessionScreen({
   const STOP_LABEL = { ko: '누르면 종료', ru: 'нажать для остановки', en: 'tap to stop' }
   const speakLabel = SPEAK_LABEL[sourceLang] || '말하기'
   const stopLabel = STOP_LABEL[sourceLang] || '누르면 종료'
-  const [linkCopied, setLinkCopied] = useState(false)
+  const [showInvitePanel, setShowInvitePanel] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
   const scrollRef = useRef(null)
 
-  const shareLink = `${window.location.origin}${window.location.pathname}?view=${sessionId}`
+  const shareLink = `${window.location.origin}/?view=${sessionId}`
+  const displayCode = sessionId.slice(0, 6).toUpperCase()
+  const shareMessage = `MoveTalk 통역 세션에 참여해 주세요.\n링크: ${shareLink}`
 
   const showToast = (message, type = 'error') =>
     setToast({ visible: true, message, type })
   const hideToast = () => setToast((t) => ({ ...t, visible: false }))
+
+  // Auto-copy link when session starts
+  useEffect(() => {
+    navigator.clipboard.writeText(shareLink).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -150,11 +158,32 @@ export default function SessionScreen({
   const handleCopyLink = async () => {
     try {
       await navigator.clipboard.writeText(shareLink)
-      setLinkCopied(true)
-      setTimeout(() => setLinkCopied(false), 2000)
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 2000)
     } catch {
-      showToast('링크 복사 실패')
+      showToast('복사 실패')
     }
+  }
+
+  const handleShareWhatsApp = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareMessage)}`, '_blank')
+  }
+
+  const handleShareTelegram = () => {
+    window.open(
+      `https://t.me/share/url?url=${encodeURIComponent(shareLink)}&text=${encodeURIComponent('MoveTalk 통역 세션에 참여해 주세요.')}`,
+      '_blank'
+    )
+  }
+
+  const handleShareSMS = () => {
+    window.location.href = `sms:?body=${encodeURIComponent(shareMessage)}`
+  }
+
+  const handleNativeShare = async () => {
+    try {
+      await navigator.share({ title: 'MoveTalk 통역 세션', text: shareMessage, url: shareLink })
+    } catch {}
   }
 
   // Styles
@@ -205,10 +234,10 @@ export default function SessionScreen({
     flexShrink: 0,
   }
 
-  const shareLinkStyle = {
+  const inviteBarStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    justifyContent: 'space-between',
     marginTop: '8px',
     padding: '8px 10px',
     backgroundColor: '#eff6ff',
@@ -216,27 +245,38 @@ export default function SessionScreen({
     border: '1px solid #bfdbfe',
   }
 
-  const linkTextStyle = {
-    flex: 1,
-    fontSize: '11px',
-    color: '#1d4ed8',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  }
-
-  const copyBtnStyle = {
-    padding: '4px 10px',
-    backgroundColor: linkCopied ? '#16a34a' : '#1d4ed8',
+  const inviteBtnStyle = {
+    padding: '6px 14px',
+    backgroundColor: showInvitePanel ? '#1e40af' : '#1d4ed8',
     color: '#fff',
     border: 'none',
-    borderRadius: '5px',
-    fontSize: '11px',
-    fontWeight: '600',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '700',
     cursor: 'pointer',
     flexShrink: 0,
-    transition: 'background-color 0.2s',
   }
+
+  const sharePanelStyle = {
+    display: 'flex',
+    gap: '6px',
+    marginTop: '6px',
+    flexWrap: 'wrap',
+  }
+
+  const shareBtn = (bg) => ({
+    flex: 1,
+    minWidth: '52px',
+    padding: '8px 4px',
+    backgroundColor: bg,
+    color: '#fff',
+    border: 'none',
+    borderRadius: '7px',
+    fontSize: '12px',
+    fontWeight: '700',
+    cursor: 'pointer',
+    textAlign: 'center',
+  })
 
   const conversationStyle = {
     flex: 1,
@@ -325,16 +365,32 @@ export default function SessionScreen({
           )}
         </div>
 
-        {/* Share link */}
-        <div style={shareLinkStyle}>
-          <span style={{ fontSize: '11px', color: '#374151', flexShrink: 0 }}>
-            📎 상대방 링크:
-          </span>
-          <span style={linkTextStyle}>{shareLink}</span>
-          <button style={copyBtnStyle} onClick={handleCopyLink}>
-            {linkCopied ? '✓ 복사됨' : '복사'}
+        {/* Invite bar */}
+        <div style={inviteBarStyle}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+            <span style={{ fontSize: '10px', color: '#6b7280' }}>참여 코드 / Код</span>
+            <span style={{ fontSize: '16px', fontWeight: '800', color: '#1d4ed8', letterSpacing: '3px', fontFamily: 'monospace' }}>
+              {displayCode}
+            </span>
+          </div>
+          <button style={inviteBtnStyle} onClick={() => setShowInvitePanel((v) => !v)}>
+            {showInvitePanel ? '닫기' : '📨 초대하기'}
           </button>
         </div>
+
+        {showInvitePanel && (
+          <div style={sharePanelStyle}>
+            <button style={shareBtn('#25D366')} onClick={handleShareWhatsApp}>WhatsApp</button>
+            <button style={shareBtn('#0088cc')} onClick={handleShareTelegram}>Telegram</button>
+            <button style={shareBtn('#4b5563')} onClick={handleShareSMS}>SMS</button>
+            {typeof navigator.share === 'function' && (
+              <button style={shareBtn('#7c3aed')} onClick={handleNativeShare}>공유</button>
+            )}
+            <button style={shareBtn(codeCopied ? '#16a34a' : '#374151')} onClick={handleCopyLink}>
+              {codeCopied ? '✓ 복사' : '📋 복사'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Conversation */}
